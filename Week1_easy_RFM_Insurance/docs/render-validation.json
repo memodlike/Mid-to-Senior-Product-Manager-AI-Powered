@@ -1,0 +1,15 @@
+{
+  "pages": 2,
+  "format": "A4",
+  "font_cmap": "все символы покрыты Inter Regular/Bold",
+  "source_text_match": true,
+  "blocks_outside_page": [],
+  "pdf_bytes": 36892,
+  "pdf_sha256": "8c56b52667e956a924ebf5da19ea110207b31046040ddccc921bd791a25e348f",
+  "versions": {
+    "reportlab": "4.4.9",
+    "PyMuPDF": "2.1",
+    "fonttools": "4.68.0"
+  },
+  "visual_review": "отдельная ручная проверка PNG необходима"
+}

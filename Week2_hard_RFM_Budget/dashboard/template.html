@@ -1,0 +1,685 @@
+<title>Magnum Go RFM</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap">
+<style>
+/* Layout: шапка с фильтрами → KPI → сегменты-карточки → RFM-сетка и графики → таблица клиентов с карточкой клиента. */
+:root {
+  --bg: #FFFFFF; --bg-soft: #DAFFED; --card: #F6F8F7; --line: #DCE3E0;
+  --fg: #000000; --muted: #4A5753; --accent: #62CDA8; --accent-ink: #006A4E;
+  --bar-2: #006A4E; --bar-3: #1B1F1E; --warn: #B4540A; --risk: #B3261E;
+  --font: Inter, Arial, sans-serif; color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E1513; --bg-soft: #13352A; --card: #16201D; --line: #283531;
+  --fg: #F2F7F5; --muted: #A9B8B3; --accent: #62CDA8; --accent-ink: #7FE0BC;
+  --bar-2: #3FA784; --bar-3: #D7E2DE; --warn: #F0A15C; --risk: #FF8A80; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0E1513; --bg-soft: #13352A; --card: #16201D; --line: #283531;
+  --fg: #F2F7F5; --muted: #A9B8B3; --accent: #62CDA8; --accent-ink: #7FE0BC;
+  --bar-2: #3FA784; --bar-3: #D7E2DE; --warn: #F0A15C; --risk: #FF8A80; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-weight: 500; font-size: 15px; line-height: 1.45; margin: 0; }
+.wrap { max-width: 1320px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 28px; }
+h1, h2, h3 { margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
+h1 { font-size: clamp(28px, 4vw, 44px); line-height: 1.05; font-weight: 700; }
+h1 em, h2 em { font-style: normal; color: var(--accent); }
+h2 { font-size: 22px; font-weight: 700; }
+.muted { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+button, select, input { font: inherit; color: inherit; }
+
+.top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; align-items: center; }
+.author { font-weight: 700; font-size: 18px; }
+.pill { display: inline-flex; align-items: center; gap: 8px; background: var(--bg-soft); color: var(--accent-ink); border-radius: 999px; padding: 7px 14px; font-weight: 600; font-size: 13px; }
+.pill.warn { background: transparent; border: 1.5px solid var(--warn); color: var(--warn); }
+.hero { display: grid; gap: 12px; }
+.hero p { max-width: 760px; margin: 0; font-size: 17px; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.filters label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.filters select, .filters input { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px; min-width: 150px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: 13px; font-weight: 600; }
+.chip:hover { border-color: var(--accent-ink); }
+.chip.on { background: var(--accent-ink); color: var(--bg); border-color: var(--accent-ink); }
+.reset { background: none; border: none; color: var(--accent-ink); font-weight: 600; cursor: pointer; padding: 6px 4px; text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.kpi { background: var(--card); border-radius: 20px; padding: 16px 18px; display: grid; gap: 4px; }
+.kpi b { font-size: 28px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.kpi span { font-size: 13px; color: var(--muted); }
+
+.segs { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 10px; }
+.seg { text-align: left; border: 1.5px solid var(--line); background: var(--bg); border-radius: 18px; padding: 14px; cursor: pointer; display: grid; gap: 6px; transition: border-color .15s, background .15s; }
+.seg:hover { border-color: var(--accent); }
+.seg.on { border-color: var(--accent-ink); background: var(--bg-soft); }
+.seg .name { font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.seg .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.seg .big { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.seg .meta { font-size: 12.5px; color: var(--muted); }
+.share { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.share i { display: block; height: 100%; background: var(--accent-ink); }
+
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr)); gap: 16px; }
+.panel { background: var(--card); border-radius: 24px; padding: 20px; display: grid; gap: 14px; min-width: 0; align-content: start; }
+.panel header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.panel header .muted { font-size: 13px; }
+
+.heat { display: grid; grid-template-columns: 28px repeat(5, 1fr); gap: 4px; }
+.heat .ax { font-size: 12px; color: var(--muted); display: grid; place-items: center; font-weight: 600; }
+.cell { border: none; border-radius: 10px; aspect-ratio: 1.5; cursor: pointer; display: grid; place-items: center; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; outline-offset: 1px; }
+.cell.on { outline: 3px solid var(--fg); }
+.heat-note { font-size: 12.5px; color: var(--muted); }
+
+svg text { fill: var(--fg); font-family: var(--font); }
+svg .grid-l { stroke: var(--line); }
+svg .ax-t { fill: var(--muted); font-size: 11px; }
+.bars { display: grid; gap: 8px; }
+.brow { display: grid; grid-template-columns: minmax(110px, 160px) 1fr auto; gap: 10px; align-items: center; cursor: pointer; border-radius: 10px; padding: 4px 6px; border: none; background: none; text-align: left; }
+.brow:hover { background: var(--bg); }
+.brow.on { background: var(--bg-soft); }
+.brow .lbl { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brow .trk { height: 12px; background: var(--line); border-radius: 6px; overflow: hidden; }
+.brow .trk i { display: block; height: 100%; background: var(--accent-ink); border-radius: 6px; }
+.brow .v { font-size: 13px; font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+
+.tablebox { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1.5px solid var(--fg); white-space: nowrap; }
+th button { background: none; border: none; padding: 0; cursor: pointer; font-weight: 600; color: inherit; }
+th button[aria-sort]::after { content: " ↓"; color: var(--accent-ink); }
+th button[aria-sort="ascending"]::after { content: " ↑"; }
+td { padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; font-variant-numeric: tabular-nums; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--bg); }
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; }
+.tag .dot { width: 8px; height: 8px; border-radius: 50%; }
+.score { font-weight: 700; letter-spacing: .04em; }
+.pager { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.pager button { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 6px 12px; cursor: pointer; }
+.pager button:disabled { opacity: .4; cursor: default; }
+
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(440px, 100%); background: var(--bg); border-left: 1px solid var(--line); box-shadow: -12px 0 40px rgba(0,0,0,.12); padding: calc(24px + env(safe-area-inset-top, 0px)) calc(22px + env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) 22px; overflow-y: auto; display: grid; gap: 16px; align-content: start; z-index: 10; }
+[hidden] { display: none !important; }
+.drawer .x { justify-self: end; border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 14px; cursor: pointer; font-weight: 600; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.fact { background: var(--card); border-radius: 14px; padding: 10px 12px; display: grid; gap: 2px; }
+.fact span { font-size: 12px; color: var(--muted); }
+.fact b { font-variant-numeric: tabular-nums; }
+.action { background: var(--bg-soft); border-radius: 16px; padding: 14px 16px; display: grid; gap: 6px; }
+.action b { color: var(--accent-ink); }
+
+.playbook { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; }
+.play { background: var(--bg); border-radius: 18px; padding: 16px; display: grid; gap: 6px; align-content: start; }
+.play h3 { font-size: 16px; display: flex; gap: 8px; align-items: center; }
+.play p { margin: 0; font-size: 14px; }
+.insights { background: var(--bg-soft); }
+.ins { margin: 0; padding: 0; list-style: none; counter-reset: i; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 10px 24px; }
+.ins li { counter-increment: i; position: relative; padding-left: 40px; font-size: 15px; }
+.ins li::before { content: counter(i); position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--accent-ink); color: var(--bg); font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+.ins b { font-variant-numeric: tabular-nums; }
+.promo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 20px; }
+.pform { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: start; }
+.pform label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 600; min-width: 0; }
+.pform select, .pform input[type=number] { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px; font-size: 14px; color: var(--fg); width: 100%; }
+.pform .chk { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--fg); font-weight: 500; }
+.pcalc { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.pcalc .kpi { background: var(--bg); }
+.pcalc .kpi b { font-size: 22px; }
+.msg { background: var(--bg); border-radius: 16px; padding: 12px 14px; font-size: 14px; }
+.msg p { margin: 4px 0 0; }
+.pwarn { margin: 0; color: var(--warn); font-weight: 600; font-size: 14px; }
+.btn { background: var(--accent-ink); color: var(--bg); border: none; border-radius: 999px; padding: 11px 20px; font-weight: 700; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--accent-ink); border: 1.5px solid var(--accent-ink); padding: 6px 12px; font-size: 13px; }
+.badge { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--accent-ink); background: var(--bg-soft); border-radius: 999px; padding: 2px 8px; }
+.code { font-family: ui-monospace, Menlo, monospace; font-weight: 700; letter-spacing: .05em; }
+@media (max-width: 560px) { .pform { grid-template-columns: 1fr; } }
+.src { display: grid; gap: 8px; font-size: 14px; }
+.src li { margin-bottom: 4px; }
+.src a { color: var(--accent-ink); word-break: break-word; }
+footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 560px) { .facts { grid-template-columns: 1fr 1fr; } .filters select, .filters input { min-width: 0; width: 100%; } .filters label { flex: 1 1 140px; } }
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <span class="author">@memodlike</span>
+    <span class="pill warn" title="Данные сгенерированы скриптом, это не реальные данные компании">Рандомизированные данные · учебный кейс</span>
+  </div>
+
+  <section class="hero">
+    <span class="pill" style="justify-self:start">Product Masters · неделя 2 · RFM</span>
+    <h1>Magnum Go: <em>кто покупает</em>, а кого мы теряем</h1>
+    <p class="muted">RFM-дашборд клиентов доставки продуктов с января 2024 по октябрь 2026. RFM пересчитывается для выбранного периода. Нажимайте на сегменты, клетки RFM-сетки, города и поставщиков: все блоки и таблица фильтруются вместе.</p>
+  </section>
+
+  <section class="filters" aria-label="Фильтры">
+    <label for="f-year">Период<select id="f-year">
+      <option value="last12">Последние 12 месяцев</option><option value="2026">2026 (янв–окт)</option>
+      <option value="2025">2025</option><option value="2024">2024</option><option value="all">Всё время (2024–2026)</option></select></label>
+    <label for="f-city">Город<select id="f-city"></select></label>
+    <label for="f-channel">Канал<select id="f-channel"></select></label>
+    <label for="f-dist">Поставщик<select id="f-dist"></select></label>
+    <label for="f-q">Поиск клиента<input id="f-q" type="search" placeholder="Имя или ID"></label>
+    <button class="reset" id="reset" type="button">Сбросить всё</button>
+  </section>
+
+  <section class="kpis" id="kpis" aria-label="Ключевые показатели"></section>
+
+  <section class="panel insights">
+    <header><h2>Главные выводы</h2><span class="muted" id="ins-sub"></span></header>
+    <ol class="ins" id="insights"></ol>
+  </section>
+
+  <section style="display:grid;gap:12px">
+    <header style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px"><h2>RFM-сегменты</h2><span class="muted" style="font-size:13px">Полоска показывает долю выручки сегмента</span></header>
+    <div class="segs" id="segs"></div>
+  </section>
+
+  <section class="grid2">
+    <div class="panel">
+      <header><h2>RFM-сетка</h2><span class="muted">R: ≤14 / 30 / 60 / 120 / 120+ дней · F: 1 / 2 / 3–4 / 5–9 / 10+ заказов</span></header>
+      <div class="heat" id="heat"></div>
+      <p class="heat-note">Справа вверху лучшие клиенты (недавно и часто), слева внизу спящие. Клик по клетке фильтрует таблицу.</p>
+    </div>
+    <div class="panel">
+      <header><h2>Заказы по месяцам</h2><span class="muted" id="trend-sub"></span></header>
+      <div id="trend"></div>
+    </div>
+  </section>
+
+  <section class="grid2">
+    <div class="panel">
+      <header><h2>Выручка по городам</h2><span class="muted">млн ₸ за 12 месяцев</span></header>
+      <div class="bars" id="cities"></div>
+    </div>
+    <div class="panel">
+      <header><h2>Поставщики и дистрибьюторы</h2><span class="muted">по основному поставщику клиента</span></header>
+      <div class="bars" id="dists"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <header>
+      <h2>Клиенты</h2>
+      <div class="chips" id="presets" role="group" aria-label="Быстрые выборки">
+        <button class="chip" data-p="top" type="button">Топ по выручке</button>
+        <button class="chip" data-p="freq" type="button">Самые частые</button>
+        <button class="chip" data-p="low" type="button">Меньше всего купили</button>
+        <button class="chip" data-p="lost" type="button">Давно не заказывали</button>
+      </div>
+    </header>
+    <div class="tablebox"><table>
+      <thead><tr>
+        <th><button data-k="name" type="button">Клиент</button></th>
+        <th><button data-k="city" type="button">Город</button></th>
+        <th><button data-k="segment" type="button">Сегмент</button></th>
+        <th><button data-k="rfm" type="button">RFM</button></th>
+        <th><button data-k="recency_days" type="button">Дней с заказа</button></th>
+        <th><button data-k="orders" type="button">Заказов</button></th>
+        <th><button data-k="revenue" type="button">Выручка, ₸</button></th>
+        <th><button data-k="avg_check" type="button">Средний чек, ₸</button></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <div class="pager"><span class="muted" id="count"></span><span style="display:flex;gap:8px"><button id="prev" type="button">Назад</button><button id="next" type="button">Дальше</button></span></div>
+  </section>
+
+  <section class="panel" id="promo">
+    <header><h2>Промокоды и рассылки</h2><span class="pill warn">Демо: сообщения не уходят реальным людям</span></header>
+    <div class="promo-grid">
+      <form id="pf" class="pform">
+        <label for="p-seg">Кому<select id="p-seg"></select></label>
+        <label for="p-ch">Канал<select id="p-ch"><option value="push">Push в Kaspi.kz</option><option value="sms">SMS</option><option value="email">E-mail</option></select></label>
+        <label for="p-type">Оффер<select id="p-type"><option value="pct">Скидка, %</option><option value="ship">Бесплатная доставка</option><option value="bonus">Бонус, ₸</option></select></label>
+        <label for="p-val">Размер<input id="p-val" type="number" min="1" max="50000" value="10"></label>
+        <label for="p-min">Мин. заказ, ₸<input id="p-min" type="number" min="0" step="500" value="7000"></label>
+        <label for="p-days">Действует, дней<input id="p-days" type="number" min="1" max="60" value="7"></label>
+        <label class="chk" for="p-ctrl"><input id="p-ctrl" type="checkbox" checked> Контрольная группа 10% (без промокода)</label>
+        <label class="chk" for="p-cap"><input id="p-cap" type="checkbox" checked> Не чаще 1 промокода в 7 дней на клиента</label>
+      </form>
+      <div class="pcalc">
+        <div class="kpis" id="p-kpis"></div>
+        <div class="msg"><span class="muted">Текст сообщения</span><p id="p-msg"></p></div>
+        <p class="pwarn" id="p-warn" hidden></p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" id="p-send" type="button">Отправить кампанию</button><span class="muted" id="p-done" role="status"></span></div>
+      </div>
+    </div>
+    <div class="tablebox"><table>
+      <thead><tr><th>Когда</th><th>Сегмент</th><th>Канал</th><th>Оффер</th><th>Отправлено</th><th>Контроль</th><th>Пропущено</th><th>Бюджет, ₸</th><th>Ожид. выручка, ₸</th><th></th></tr></thead>
+      <tbody id="p-log"><tr><td colspan="10" class="muted">Кампаний ещё нет. Выберите сегмент и нажмите «Отправить кампанию».</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section class="panel">
+    <header><h2>Что делать с каждым сегментом</h2><span class="muted">связь с решением кейса: −20% бюджета, +10% выручки</span></header>
+    <div class="playbook" id="playbook"></div>
+  </section>
+
+  <section class="panel">
+    <header><h2>Откуда данные</h2></header>
+    <div class="src" id="sources"></div>
+  </section>
+
+  <footer><span>@memodlike · Product Masters · неделя 2</span><span id="foot-note"></span></footer>
+</div>
+
+<aside class="drawer" id="drawer" hidden aria-label="Карточка клиента"></aside>
+
+<script>
+const DATA = /*DATA*/null;
+const SOURCES = /*SOURCES*/null;
+
+const SEGMENTS = [
+  { id: "champ", name: "Чемпионы", color: "#006A4E", test: (r, f) => r >= 4 && f >= 4,
+    action: "Без общих скидок: ранний доступ, закрытые акции, реферальная программа «приведи друга».", kpi: "Частота не падает, конверсия приглашений" },
+  { id: "loyal", name: "Лояльные", color: "#2E9C78", test: (r, f) => r >= 3 && f >= 3,
+    action: "Персональные подборки и наборы по истории корзины, порог бесплатной доставки выше среднего чека.", kpi: "Средний чек +5%" },
+  { id: "new", name: "Новые", color: "#62CDA8", test: (r, f) => r >= 4 && f === 1,
+    action: "Цепочка второй покупки D+3 / D+14 / D+30 в Kaspi и push, бонус на второй заказ.", kpi: "Вторая покупка за 60 дней" },
+  { id: "potential", name: "Потенциально лояльные", color: "#9ADFC6", test: (r, f) => r >= 4 && f <= 3,
+    action: "Напоминание о пополнении корзины, подписка на регулярные продукты.", kpi: "Переход в «Лояльные»" },
+  { id: "attention", name: "Требуют внимания", color: "#E3B341", test: (r, f) => r === 3 && f <= 2,
+    action: "Короткий опрос о качестве доставки и персональный оффер по любимой категории.", kpi: "Повторный заказ за 30 дней" },
+  { id: "risk", name: "Под угрозой оттока", color: "#D9822B", test: (r, f) => r <= 2 && f >= 3,
+    action: "Win-back: персональное предложение, звонок клиентам с высоким M, выяснить причину ухода.", kpi: "Доля вернувшихся за 60 дней" },
+  { id: "sleep", name: "Спящие", color: "#8A9692", test: () => true,
+    action: "Одна недорогая реактивация, затем исключение из платного ретаргета и массовых промокодов.", kpi: "Экономия бюджета без потери выручки" },
+];
+const MN = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+const ALL_MONTHS = Array.from({ length: 34 }, (_, i) => MN[i % 12] + (i % 12 === 0 ? " " + String(24 + i / 12) : ""));
+const PERIODS = { last12: [22, 33, "2026-10-19"], 2026: [24, 33, "2026-10-19"], 2025: [12, 23, "2025-12-31"], 2024: [0, 11, "2024-12-31"], all: [0, 33, "2026-10-19"] };
+const PRICE = (i) => (i < 12 ? 0.88 : i < 24 ? 0.94 : 1);
+let MONTHS = [];
+const nf = new Intl.NumberFormat("ru-RU");
+const fmt = (v) => nf.format(Math.round(v));
+const mln = (v) => (v / 1e6).toLocaleString("ru-RU", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// Квинтили по всей базе (баллы стабильны при фильтрации).
+function quintile(values, v, higherBetter) {
+  const sorted = values; // уже отсортированы по возрастанию
+  let lo = 0, hi = sorted.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (sorted[m] < v) lo = m + 1; else hi = m; }
+  let hiIdx = lo; while (hiIdx < sorted.length && sorted[hiIdx] === v) hiIdx++;
+  const pos = ((lo + hiIdx) / 2) / sorted.length;
+  const q = Math.min(5, Math.floor(pos * 5) + 1);
+  return higherBetter ? q : 6 - q;
+}
+const RAW = DATA.customers;
+const DIST = Object.fromEntries(DATA.distributors.map((d) => [d.id, d]));
+let C = [];
+const DAY = 864e5;
+function applyPeriod(key) {
+  const [a, b, endStr] = PERIODS[key];
+  const end = new Date(endStr + "T00:00:00Z");
+  MONTHS = ALL_MONTHS.slice(a, b + 1);
+  C = [];
+  for (const r of RAW) {
+    const pm = r.monthly.slice(a, b + 1);
+    const orders = pm.reduce((s, v) => s + v, 0);
+    if (!orders) continue;
+    let revenue = 0; pm.forEach((v, j) => (revenue += v * r.avg_check * PRICE(a + j)));
+    const li = a + pm.length - 1 - [...pm].reverse().findIndex((v) => v > 0);
+    const lastAll = r.monthly.length - 1 - [...r.monthly].reverse().findIndex((v) => v > 0);
+    const fi = r.monthly.findIndex((v) => v > 0);
+    const day = 1 + (parseInt(r.id.slice(1), 10) * 7 + li) % 28;
+    const last = li === lastAll ? r.last_order : `${2024 + Math.floor(li / 12)}-${String(li % 12 + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const c = { ...r, pm, orders, revenue: Math.round(revenue), avg_check: Math.round(revenue / orders), last_order: last,
+      recency_days: Math.max(0, Math.round((end - new Date(last + "T00:00:00Z")) / DAY)), isNew: fi >= a };
+    const d = c.recency_days, n = c.orders;
+    c.R = d <= 14 ? 5 : d <= 30 ? 4 : d <= 60 ? 3 : d <= 120 ? 2 : 1;
+    c.F = n >= 10 ? 5 : n >= 5 ? 4 : n >= 3 ? 3 : n === 2 ? 2 : 1;
+    C.push(c);
+  }
+  const mons = C.map((c) => c.revenue).sort((x, y) => x - y);
+  for (const c of C) {
+    c.M = quintile(mons, c.revenue, true);
+    c.rfm = `${c.R}${c.F}${c.M}`;
+    c.seg = SEGMENTS.find((s) => s.test(c.R, c.F)); c.segment = c.seg.name;
+  }
+}
+
+const state = { year: "last12", city: "", channel: "", dist: "", q: "", seg: "", cell: "", preset: "", sort: "revenue", dir: -1, page: 0 };
+try { const saved = JSON.parse(localStorage.getItem("mg-rfm") || "{}"); if (saved.sort) { state.sort = saved.sort; state.dir = saved.dir; } } catch (e) {}
+
+const $ = (id) => document.getElementById(id);
+function fillSelect(el, label, items) {
+  el.innerHTML = `<option value="">${label}</option>` + items.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
+}
+fillSelect($("f-city"), "Все города", DATA.cities.map((c) => [c, c]));
+fillSelect($("f-channel"), "Все каналы", [...new Set(C.map((c) => c.channel))].map((c) => [c, c]));
+fillSelect($("f-dist"), "Все поставщики", DATA.distributors.map((d) => [d.id, `${d.name} · ${d.category}`]));
+
+function base(skip) {
+  return C.filter((c) =>
+    (skip === "city" || !state.city || c.city === state.city) &&
+    (!state.channel || c.channel === state.channel) &&
+    (skip === "dist" || !state.dist || c.top_distributor === state.dist) &&
+    (!state.q || (c.name + " " + c.id).toLowerCase().includes(state.q.toLowerCase())));
+}
+function withSeg(list, skipSeg) {
+  return list.filter((c) => (skipSeg || !state.seg || c.seg.id === state.seg) && (!state.cell || `${c.R}${c.F}` === state.cell));
+}
+
+function renderKpis(list) {
+  const orders = list.reduce((s, c) => s + c.orders, 0);
+  const rev = list.reduce((s, c) => s + c.revenue, 0);
+  const repeat = list.filter((c) => c.orders > 1).length;
+  const lost = list.filter((c) => c.recency_days > 120).length;
+  const n = list.length || 1;
+  const k = [
+    [fmt(list.length), "клиентов"], [fmt(orders), "заказов за период"], [mln(rev) + " млн ₸", "выручка"],
+    [fmt(orders ? rev / orders : 0) + " ₸", "средний чек"], [Math.round(repeat / n * 100) + "%", "сделали 2+ заказа"],
+    [Math.round(lost / n * 100) + "%", "не заказывали 120+ дней"],
+  ];
+  $("kpis").innerHTML = k.map(([b, s]) => `<div class="kpi"><b>${b}</b><span>${s}</span></div>`).join("");
+}
+
+const PERIOD_NAME = { last12: "последние 12 месяцев", 2026: "2026 год (янв–окт)", 2025: "2025 год", 2024: "2024 год", all: "весь период 2024–2026" };
+function yearRevenue(y, list) {
+  const [a, b] = PERIODS[y]; const ids = new Set(list.map((c) => c.id));
+  let s = 0; for (const r of RAW) { if (!ids.has(r.id) && list.length !== C.length) continue; for (let i = a; i <= b; i++) s += r.monthly[i] * r.avg_check * PRICE(i); }
+  return s;
+}
+function renderInsights(list) {
+  const pc = (x, n) => Math.round(x / (n || 1) * 100);
+  const rev = list.reduce((s, c) => s + c.revenue, 0);
+  const by = (id) => { const g = list.filter((c) => c.seg.id === id); return { n: g.length, r: g.reduce((s, c) => s + c.revenue, 0) }; };
+  const champ = by("champ"), risk = by("risk"), sleep = by("sleep"), loyal = by("loyal");
+  const news = list.filter((c) => c.isNew), newRep = news.filter((c) => c.orders > 1).length;
+  const cities = groupBy(list, (c) => c.city);
+  const L = MONTHS.length, m = Array(L).fill(0); list.forEach((c) => c.pm.forEach((v, i) => (m[i] += v)));
+  const ch = m[L - 3] ? Math.round((m[L - 1] / m[L - 3] - 1) * 100) : 0;
+  const items = [
+    `<b>${pc(champ.n + loyal.n, list.length)}% клиентов</b> (чемпионы и лояльные) дают <b>${pc(champ.r + loyal.r, rev)}% выручки</b>. Их удерживаем сервисом и привилегиями, а не скидками.`,
+    `<b>Под угрозой оттока ${fmt(risk.n)} клиентов</b> с выручкой <b>${mln(risk.r)} млн ₸</b> (${pc(risk.r, rev)}%). Это главный резерв: вернуть часть дешевле, чем привлечь новых.`,
+    `<b>Спящие — ${pc(sleep.n, list.length)}% базы</b>, но только <b>${pc(sleep.r, rev)}% выручки</b>. Массовые акции на них урезаем: отсюда основная экономия бюджета.`,
+    `Из ${fmt(news.length)} новых клиентов периода <b>только ${pc(newRep, news.length)}% сделали второй заказ</b>. Цепочка второй покупки — рычаг №1 для роста выручки.`,
+    `Заказы: <b>${MONTHS[L - 1]} к ${MONTHS[L - 3]} ${ch >= 0 ? "+" : "−"}${Math.abs(ch)}%</b>${PERIODS[state.year][1] === 33 ? " (октябрь неполный: данные до 19-го)" : ""}${ch < 0 ? ". Повторные покупки падают, реагировать нужно сейчас" : ""}.`,
+    cities.length ? `<b>${esc(cities[0].k)}</b> — ${pc(cities[0].v, rev)}% выручки${cities[1] ? `, ${esc(cities[0].k)} и ${esc(cities[1].k)} вместе — ${pc(cities[0].v + cities[1].v, rev)}%` : ""}. Пилоты удержания запускаем здесь, где больше всего клиентов.` : "",
+  ];
+  if (["2025", "2026"].includes(state.year) && !state.city && !state.channel && !state.dist && !state.q && !state.seg && !state.cell) {
+    const prev = yearRevenue(String(+state.year - 1), C), cur = yearRevenue(state.year, C);
+    const note = state.year === "2026" ? " (10 мес. против 12)" : "";
+    items.push(`Выручка к прошлому году: <b>${cur >= prev ? "+" : "−"}${Math.abs(Math.round((cur / prev - 1) * 100))}%</b>${note}.`);
+  }
+  $("insights").innerHTML = items.filter(Boolean).map((t) => `<li>${t}</li>`).join("");
+  $("ins-sub").textContent = `${PERIOD_NAME[state.year]} · ${fmt(list.length)} клиентов в выборке`;
+}
+
+// ---------- Промокоды (демо: генерация кодов и журнал в браузере, без реальной отправки)
+const RESP = { champ: 0.25, loyal: 0.18, new: 0.15, potential: 0.12, attention: 0.10, risk: 0.08, sleep: 0.03 };
+const SEG_OFFER = { champ: ["ship", 0], loyal: ["bonus", 1500], new: ["pct", 15], potential: ["pct", 10], attention: ["ship", 0], risk: ["pct", 20], sleep: ["pct", 10] };
+const CH_COST = { push: 0, sms: 12, email: 1 };
+const CH_NAME = { push: "Push в Kaspi.kz", sms: "SMS", email: "E-mail" };
+const PROMO = { log: [], sent: {} };
+try { Object.assign(PROMO, JSON.parse(localStorage.getItem("mg-promo") || "{}")); } catch (e) {}
+const savePromo = () => { try { localStorage.setItem("mg-promo", JSON.stringify(PROMO)); } catch (e) {} };
+const ALPH = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function code(seg) { let s = ""; const a = new Uint32Array(6); crypto.getRandomValues(a); for (const v of a) s += ALPH[v % ALPH.length]; return `MG-${seg.toUpperCase().slice(0, 4)}-${s}`; }
+function offerText(o) { return o.type === "pct" ? `скидка ${o.val}%` : o.type === "bonus" ? `бонус ${fmt(o.val)} ₸` : "бесплатная доставка"; }
+function promoForm() {
+  return { seg: $("p-seg").value, ch: $("p-ch").value, type: $("p-type").value, val: +$("p-val").value || 0,
+    min: +$("p-min").value || 0, days: +$("p-days").value || 7, ctrl: $("p-ctrl").checked, cap: $("p-cap").checked };
+}
+function promoAudience(o) {
+  const pool = withSeg(base(), true).filter((c) => c.seg.id === o.seg).sort((a, b) => a.id.localeCompare(b.id));
+  const now = Date.now();
+  const capped = o.cap ? pool.filter((c) => PROMO.sent[c.id] && now - PROMO.sent[c.id].ts < 7 * DAY) : [];
+  const ok = pool.filter((c) => !capped.includes(c));
+  const ctrl = o.ctrl ? ok.filter((c) => parseInt(c.id.slice(1), 10) % 10 === 0) : [];
+  return { pool, capped, ctrl, send: ok.filter((c) => !ctrl.includes(c)) };
+}
+function promoEconomics(list, o) {
+  const r = RESP[o.seg] ?? 0.1;
+  const avg = list.length ? list.reduce((s, c) => s + c.avg_check, 0) / list.length : 0;
+  const uses = list.length * r;
+  const perUse = o.type === "pct" ? avg * o.val / 100 : o.type === "bonus" ? o.val : 900; // доставка ≈ 900 ₸
+  const cost = uses * perUse + list.length * CH_COST[o.ch];
+  return { r, uses, cost, revenue: uses * Math.max(avg, o.min) };
+}
+function renderPromo() {
+  const o = promoForm();
+  const a = promoAudience(o);
+  const e = promoEconomics(a.send, o);
+  const segName = SEGMENTS.find((s) => s.id === o.seg).name;
+  $("p-kpis").innerHTML = [
+    [fmt(a.send.length), "получат промокод"], [fmt(a.ctrl.length), "в контрольной группе"],
+    [Math.round(e.r * 100) + "%", "ожидаемая активация"], [fmt(e.cost) + " ₸", "бюджет кампании"],
+    [fmt(e.revenue) + " ₸", "ожидаемая выручка"], [e.cost ? (e.revenue / e.cost).toFixed(1).replace(".", ",") + "×" : "—", "выручка на 1 ₸"],
+  ].map(([b, s]) => `<div class="kpi"><b>${b}</b><span>${s}</span></div>`).join("");
+  const sample = a.send[0];
+  $("p-msg").textContent = `${sample ? sample.name.split(" ")[0] : "Айгерим"}, для вас ${offerText(o)} на заказ в Magnum от ${fmt(o.min)} ₸. Промокод ${code(o.seg).replace(/-[A-Z0-9]+$/, "-XXXXXX")} действует ${o.days} дн. Заказать в Kaspi.kz → Magnum.`;
+  const warn = o.seg === "champ" && o.type === "pct" ? "Чемпионы покупают и без скидки: по решению кейса им лучше дать привилегию (бесплатную доставку, ранний доступ), а не процент."
+    : o.seg === "sleep" && o.ch === "sms" ? "Спящим SMS невыгодно: отклик около 3%. По плану — один бесплатный канал (push или e-mail)."
+    : a.capped.length ? `Пропущено клиентов: ${fmt(a.capped.length)}. Им уже отправляли промокод за последние 7 дней.` : "";
+  $("p-warn").hidden = !warn; $("p-warn").textContent = warn;
+  $("p-send").disabled = !a.send.length;
+  $("p-send").textContent = a.send.length ? `Отправить кампанию: ${fmt(a.send.length)} · ${segName}` : "Нет получателей под эти фильтры";
+}
+function sendPromo(list, o, extra = {}) {
+  const when = new Date().toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const codes = list.map((c) => { const cd = code(o.seg); PROMO.sent[c.id] = { code: cd, offer: offerText(o), when, ts: Date.now() }; return [c.id, c.name, cd]; });
+  const e = promoEconomics(list, o);
+  PROMO.log.unshift({ when, seg: o.seg, ch: o.ch, offer: offerText(o), n: list.length, ctrl: extra.ctrl || 0, capped: extra.capped || 0,
+    cost: Math.round(e.cost), revenue: Math.round(e.revenue), codes: codes.slice(0, 2000) });
+  PROMO.log = PROMO.log.slice(0, 30);
+  savePromo(); renderLog(); render();
+}
+function renderLog() {
+  $("p-log").innerHTML = PROMO.log.length ? PROMO.log.map((l, i) => `<tr><td>${l.when}</td><td>${SEGMENTS.find((s) => s.id === l.seg).name}</td><td>${CH_NAME[l.ch]}</td><td>${l.offer}</td>
+    <td>${fmt(l.n)}</td><td>${fmt(l.ctrl)}</td><td>${fmt(l.capped)}</td><td>${fmt(l.cost)}</td><td>${fmt(l.revenue)}</td>
+    <td><button class="btn ghost" data-copy="${i}" type="button">Копировать коды</button></td></tr>`).join("")
+    : `<tr><td colspan="10" class="muted">Кампаний ещё нет. Выберите сегмент и нажмите «Отправить кампанию».</td></tr>`;
+}
+$("p-seg").innerHTML = SEGMENTS.map((s) => `<option value="${s.id}">${s.name}</option>`).join("");
+$("p-seg").value = "risk";
+const applyOffer = () => { const o = SEG_OFFER[$("p-seg").value]; $("p-type").value = o[0]; $("p-val").value = o[1] || 10; };
+applyOffer();
+$("p-seg").onchange = () => { applyOffer(); renderPromo(); };
+$("pf").addEventListener("input", renderPromo);
+$("pf").addEventListener("submit", (e) => e.preventDefault());
+$("p-send").onclick = () => {
+  const o = promoForm(); const a = promoAudience(o);
+  if (!a.send.length) return;
+  sendPromo(a.send, o, { ctrl: a.ctrl.length, capped: a.capped.length });
+  $("p-done").textContent = `Отправлено (демо): ${fmt(a.send.length)} промокодов. Коды — в журнале ниже.`;
+};
+$("p-log").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-copy]"); if (!b) return;
+  const l = PROMO.log[+b.dataset.copy];
+  const text = "id;клиент;промокод\n" + l.codes.map((r) => r.join(";")).join("\n");
+  try { await navigator.clipboard.writeText(text); b.textContent = "Скопировано"; }
+  catch (err) { b.textContent = "Не удалось скопировать"; }
+  setTimeout(() => (b.textContent = "Копировать коды"), 1800);
+});
+
+function renderSegs(list) {
+  const rev = list.reduce((s, c) => s + c.revenue, 0) || 1;
+  $("segs").innerHTML = SEGMENTS.map((s) => {
+    const g = list.filter((c) => c.seg === s);
+    const r = g.reduce((a, c) => a + c.revenue, 0);
+    return `<button class="seg ${state.seg === s.id ? "on" : ""}" data-seg="${s.id}" type="button" aria-pressed="${state.seg === s.id}">
+      <span class="name"><i class="dot" style="background:${s.color}"></i>${s.name}</span>
+      <span class="big">${fmt(g.length)}</span>
+      <span class="meta">${Math.round(g.length / (list.length || 1) * 100)}% клиентов · ${Math.round(r / rev * 100)}% выручки</span>
+      <span class="share"><i style="width:${r / rev * 100}%"></i></span></button>`;
+  }).join("");
+}
+
+function renderHeat(list) {
+  const counts = {}; let max = 1;
+  for (const c of list) { const k = `${c.R}${c.F}`; counts[k] = (counts[k] || 0) + 1; max = Math.max(max, counts[k]); }
+  let h = "";
+  for (let f = 5; f >= 1; f--) {
+    h += `<span class="ax">F${f}</span>`;
+    for (let r = 1; r <= 5; r++) {
+      const k = `${r}${f}`, n = counts[k] || 0, t = n / max;
+      const seg = SEGMENTS.find((s) => s.test(r, f));
+      const bg = `color-mix(in srgb, ${seg.color} ${Math.round(18 + t * 82)}%, var(--bg))`;
+      const ink = t > 0.55 ? "#FFFFFF" : "var(--fg)";
+      h += `<button class="cell ${state.cell === k ? "on" : ""}" data-cell="${k}" type="button" style="background:${bg};color:${ink}" title="R${r} F${f}: ${n} клиентов, сегмент «${seg.name}»" aria-label="R${r} F${f}: ${n} клиентов">${n}</button>`;
+    }
+  }
+  h += `<span></span>` + [1, 2, 3, 4, 5].map((r) => `<span class="ax">R${r}</span>`).join("");
+  $("heat").innerHTML = h;
+}
+
+function renderTrend(list) {
+  const L = MONTHS.length;
+  const m = Array(L).fill(0);
+  const newM = Array(L).fill(0);
+  for (const c of list) {
+    c.pm.forEach((v, i) => (m[i] += v));
+    const fi = c.pm.findIndex((v) => v > 0);
+    if (fi >= 0 && c.isNew) newM[fi] += 1;
+  }
+  const W = 560, H = 220, P = { l: 44, r: 12, t: 16, b: 28 };
+  const max = Math.max(...m, 1) * 1.1;
+  const x = (i) => P.l + i * (W - P.l - P.r) / Math.max(L - 1, 1);
+  const y = (v) => P.t + (H - P.t - P.b) * (1 - v / max);
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => Math.round(max * t / 10) * 10);
+  const pts = m.map((v, i) => `${x(i)},${y(v)}`).join(" ");
+  const area = `${x(0)},${y(0)} ${pts} ${x(L - 1)},${y(0)}`;
+  const bw = (W - P.l - P.r) / L * 0.5;
+  const nmax = Math.max(...newM, 1);
+  $("trend").innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Заказы по месяцам">
+    ${ticks.map((t) => `<line class="grid-l" x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}"/><text class="ax-t" x="${P.l - 6}" y="${y(t) + 4}" text-anchor="end">${fmt(t)}</text>`).join("")}
+    ${newM.map((v, i) => `<rect x="${x(i) - bw / 2}" y="${y(0) - v / nmax * (H - P.t - P.b) * 0.35}" width="${bw}" height="${v / nmax * (H - P.t - P.b) * 0.35}" rx="3" fill="var(--accent)" opacity=".55"><title>${MONTHS[i]}: новых клиентов ${v}</title></rect>`).join("")}
+    <polygon points="${area}" fill="var(--accent-ink)" opacity=".12"/>
+    <polyline points="${pts}" fill="none" stroke="var(--accent-ink)" stroke-width="2.5" stroke-linejoin="round"/>
+    ${m.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="${i === L - 1 ? 5 : 3}" fill="var(--accent-ink)"><title>${MONTHS[i]}: ${fmt(v)} заказов</title></circle>`).join("")}
+    <text x="${x(L - 1)}" y="${y(m[L - 1]) - 10}" text-anchor="end" font-size="12" font-weight="700">${fmt(m[L - 1])}</text>
+    ${MONTHS.map((t, i) => (L <= 12 || i % 3 === 0) ? `<text class="ax-t" x="${x(i)}" y="${H - 8}" text-anchor="middle">${t}</text>` : "").join("")}
+  </svg>`;
+  const prev = m[L - 3] || 1;
+  $("trend-sub").textContent = `линия — заказы, столбики — новые клиенты; ${MONTHS[L - 1]} к ${MONTHS[L - 3]}: ${m[L - 1] >= prev ? "+" : "−"}${Math.abs(Math.round((m[L - 1] / prev - 1) * 100))}%`;
+}
+
+function renderBars(el, groups, key, active) {
+  const max = Math.max(...groups.map((g) => g.v), 1);
+  el.innerHTML = groups.map((g) => `<button class="brow ${active === g.k ? "on" : ""}" data-${key}="${esc(g.k)}" type="button" aria-pressed="${active === g.k}">
+    <span class="lbl" title="${esc(g.t)}">${esc(g.t)}</span><span class="trk"><i style="width:${g.v / max * 100}%"></i></span>
+    <span class="v">${mln(g.v)} · ${fmt(g.n)} кл.</span></button>`).join("");
+}
+function groupBy(list, f) {
+  const m = new Map();
+  for (const c of list) { const k = f(c); const g = m.get(k) || { k, v: 0, n: 0 }; g.v += c.revenue; g.n++; m.set(k, g); }
+  return [...m.values()].sort((a, b) => b.v - a.v);
+}
+
+const PAGE = 15;
+function sortedRows(list) {
+  const k = state.sort, d = state.dir;
+  return [...list].sort((a, b) => {
+    const va = k === "segment" ? SEGMENTS.indexOf(a.seg) : a[k], vb = k === "segment" ? SEGMENTS.indexOf(b.seg) : b[k];
+    return (typeof va === "string" ? va.localeCompare(vb, "ru") : va - vb) * d;
+  });
+}
+function renderTable(list) {
+  const rows = sortedRows(list);
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE));
+  state.page = Math.min(state.page, pages - 1);
+  const slice = rows.slice(state.page * PAGE, state.page * PAGE + PAGE);
+  $("rows").innerHTML = slice.map((c) => `<tr data-id="${c.id}" tabindex="0">
+    <td><b>${esc(c.name)}</b> <span class="muted">${c.id}</span>${PROMO.sent[c.id] ? `<span class="badge" title="Промокод ${PROMO.sent[c.id].code}">промокод</span>` : ""}</td><td>${esc(c.city)}</td>
+    <td><span class="tag"><i class="dot" style="background:${c.seg.color}"></i>${c.segment}</span></td>
+    <td class="score">${c.rfm}</td><td>${fmt(c.recency_days)}</td><td>${fmt(c.orders)}</td><td>${fmt(c.revenue)}</td><td>${fmt(c.avg_check)}</td></tr>`).join("")
+    || `<tr><td colspan="8" class="muted">Под эти фильтры клиентов нет. Нажмите «Сбросить всё».</td></tr>`;
+  $("count").textContent = `${fmt(rows.length)} клиентов · страница ${state.page + 1} из ${pages}`;
+  $("prev").disabled = state.page === 0; $("next").disabled = state.page >= pages - 1;
+  document.querySelectorAll("th button").forEach((b) => {
+    if (b.dataset.k === state.sort) b.setAttribute("aria-sort", state.dir < 0 ? "descending" : "ascending"); else b.removeAttribute("aria-sort");
+  });
+  document.querySelectorAll("#presets .chip").forEach((b) => b.classList.toggle("on", b.dataset.p === state.preset));
+}
+
+function openCustomer(id) {
+  const c = C.find((x) => x.id === id); if (!c) return;
+  const d = DIST[c.top_distributor];
+  const max = Math.max(...c.pm, 1); const bwS = 300 / c.pm.length;
+  const spark = `<svg viewBox="0 0 300 80" width="100%" role="img" aria-label="Заказы клиента по месяцам">
+    ${c.pm.map((v, i) => `<rect x="${i * bwS + 1}" y="${62 - v / max * 54}" width="${bwS * 0.72}" height="${Math.max(v / max * 54, 1.5)}" rx="2" fill="${v ? "var(--accent-ink)" : "var(--line)"}"><title>${MONTHS[i]}: ${v}</title></rect>${c.pm.length <= 12 ? `<text class="ax-t" x="${i * bwS + bwS * 0.36}" y="76" text-anchor="middle">${MONTHS[i][0]}</text>` : ""}`).join("")}</svg>`;
+  $("drawer").innerHTML = `<button class="x" id="close" type="button">Закрыть</button>
+    <div style="display:grid;gap:6px"><span class="tag"><i class="dot" style="background:${c.seg.color}"></i>${c.segment} · RFM ${c.rfm}</span>
+    <h2>${esc(c.name)}</h2><span class="muted">${c.id} · ${esc(c.city)} · ${esc(c.channel)}</span></div>
+    <div class="facts">
+      <div class="fact"><span>Последний заказ</span><b>${c.last_order}</b></div>
+      <div class="fact"><span>Дней назад</span><b>${fmt(c.recency_days)}</b></div>
+      <div class="fact"><span>Заказов за период</span><b>${fmt(c.orders)}</b></div>
+      <div class="fact"><span>Выручка</span><b>${fmt(c.revenue)} ₸</b></div>
+      <div class="fact"><span>Средний чек</span><b>${fmt(c.avg_check)} ₸</b></div>
+      <div class="fact"><span>Первый заказ</span><b>${c.first_order}</b></div>
+      <div class="fact" style="grid-column:1/-1"><span>Любимая категория и поставщик</span><b>${esc(c.top_category)} · ${esc(d ? d.name : c.top_distributor)}</b></div>
+    </div>
+    <div style="display:grid;gap:6px"><b>Заказы по месяцам</b>${spark}</div>
+    <div class="action"><b>Следующее действие</b><span>${c.seg.action}</span><span class="muted" style="font-size:13px">Метрика: ${c.seg.kpi}</span></div>
+    <div class="action" style="background:var(--card)"><b>Персональный промокод</b>${PROMO.sent[c.id]
+      ? `<span>Отправлен: <span class="code">${PROMO.sent[c.id].code}</span> · ${PROMO.sent[c.id].offer} · ${PROMO.sent[c.id].when}</span>`
+      : `<span class="muted" style="font-size:13px">Оффер подобран под сегмент. Сообщение не уходит реальному человеку (демо).</span><button class="btn ghost" id="one-send" type="button" style="justify-self:start">Отправить промокод</button>`}</div>`;
+  $("drawer").hidden = false;
+  $("close").focus();
+  $("close").onclick = () => { $("drawer").hidden = true; };
+  const one = $("one-send");
+  if (one) one.onclick = () => { const o = SEG_OFFER[c.seg.id]; sendPromo([c], { seg: c.seg.id, ch: "push", type: o[0], val: o[1], min: 7000, days: 7, single: true }); openCustomer(c.id); };
+}
+
+function render() {
+  const b = base();
+  const scoped = withSeg(b);
+  renderKpis(scoped);
+  renderInsights(scoped);
+  renderSegs(withSeg(b, true).filter((c) => !state.cell || `${c.R}${c.F}` === state.cell));
+  renderHeat(b.filter((c) => !state.seg || c.seg.id === state.seg));
+  renderTrend(scoped);
+  renderBars($("cities"), groupBy(withSeg(base("city")), (c) => c.city).map((g) => ({ ...g, t: g.k })), "city", state.city);
+  renderBars($("dists"), groupBy(withSeg(base("dist")), (c) => c.top_distributor).map((g) => ({ ...g, t: DIST[g.k] ? DIST[g.k].name : g.k })), "dist", state.dist);
+  renderTable(scoped);
+  if (state.seg && $("p-seg").value !== state.seg) { $("p-seg").value = state.seg; applyOffer(); }
+  renderPromo();
+  $("f-year").value = state.year; $("f-city").value = state.city; $("f-channel").value = state.channel; $("f-dist").value = state.dist;
+}
+
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-seg],[data-cell],[data-city],[data-dist],[data-p],[data-k],tbody tr[data-id]");
+  if (!t) return;
+  if (t.dataset.seg) { state.seg = state.seg === t.dataset.seg ? "" : t.dataset.seg; state.cell = ""; }
+  else if (t.dataset.cell) { state.cell = state.cell === t.dataset.cell ? "" : t.dataset.cell; state.seg = ""; }
+  else if (t.dataset.city) state.city = state.city === t.dataset.city ? "" : t.dataset.city;
+  else if (t.dataset.dist) state.dist = state.dist === t.dataset.dist ? "" : t.dataset.dist;
+  else if (t.dataset.p) {
+    const p = { top: ["revenue", -1], freq: ["orders", -1], low: ["revenue", 1], lost: ["recency_days", -1] }[t.dataset.p];
+    state.preset = state.preset === t.dataset.p ? "" : t.dataset.p;
+    [state.sort, state.dir] = state.preset ? p : ["revenue", -1];
+  } else if (t.dataset.k) {
+    state.dir = state.sort === t.dataset.k ? -state.dir : (t.dataset.k === "name" || t.dataset.k === "city" ? 1 : -1);
+    state.sort = t.dataset.k; state.preset = "";
+    try { localStorage.setItem("mg-rfm", JSON.stringify({ sort: state.sort, dir: state.dir })); } catch (err) {}
+  } else if (t.dataset.id) { openCustomer(t.dataset.id); return; }
+  state.page = 0; render();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") $("drawer").hidden = true;
+  if (e.key === "Enter" && e.target.matches("tbody tr[data-id]")) openCustomer(e.target.dataset.id);
+});
+$("f-year").onchange = (e) => { state.year = e.target.value; applyPeriod(state.year); state.page = 0; $("drawer").hidden = true; render(); };
+$("f-city").onchange = (e) => { state.city = e.target.value; state.page = 0; render(); };
+$("f-channel").onchange = (e) => { state.channel = e.target.value; state.page = 0; render(); };
+$("f-dist").onchange = (e) => { state.dist = e.target.value; state.page = 0; render(); };
+$("f-q").oninput = (e) => { state.q = e.target.value.trim(); state.page = 0; render(); };
+$("prev").onclick = () => { state.page--; render(); };
+$("next").onclick = () => { state.page++; render(); };
+$("reset").onclick = () => { Object.assign(state, { city: "", channel: "", dist: "", q: "", seg: "", cell: "", preset: "", page: 0 }); $("f-q").value = ""; render(); };
+
+renderLog();
+$("playbook").innerHTML = SEGMENTS.map((s) => `<div class="play"><h3><i class="dot" style="width:10px;height:10px;border-radius:50%;background:${s.color}"></i>${s.name}</h3><p>${s.action}</p><p class="muted" style="font-size:13px">Метрика: ${s.kpi}</p></div>`).join("");
+$("sources").innerHTML = SOURCES;
+applyPeriod(state.year);
+$("foot-note").textContent = `${DATA.meta.note}. Seed ${DATA.meta.seed}, дата анализа ${DATA.meta.analysis_date}.`;
+render();
+</script>

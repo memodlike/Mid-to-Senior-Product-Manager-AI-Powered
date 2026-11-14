@@ -1,0 +1,34 @@
+[
+  {
+    "url": "https://api.crossref.org/works/10.1108/IJBM-11-2016-0175",
+    "access_date": "2026-10-12",
+    "status": "метаданные и аннотация",
+    "excerpt": "customer retention is positively influenced by the number of products hold",
+    "sha256": "8db70d4a67835506747dcf9bbdfe0cb7c5831ad17e7dc90bdbd642f247f1d6cd",
+    "bytes": 20702
+  },
+  {
+    "url": "https://api.crossref.org/works/10.1057/s41288-020-00187-2",
+    "access_date": "2026-10-12",
+    "status": "только метаданные; содержание не использовано",
+    "excerpt": "Non-life insurance cancellation: a systematic quantitative literature review",
+    "sha256": "d03ef1b1f0c82da8e675bc6084e86c31d679b0c6e978f55221a1d7525dbd4e19",
+    "bytes": 23925
+  },
+  {
+    "url": "https://api.crossref.org/works/10.1017/asb.2022.18",
+    "access_date": "2026-10-12",
+    "status": "метаданные и аннотация оригинальной журнальной работы",
+    "excerpt": "retain the current set of policies, churn, or add/drop a coverage",
+    "sha256": "572320ec354ccb9ba62b83b3f50792d3d4fa06f805deaede26a5b984f0e0853d",
+    "bytes": 12236
+  },
+  {
+    "url": "https://aisel.aisnet.org/cgi/viewcontent.cgi?article=1037&context=iceb2022",
+    "access_date": "2026-10-12",
+    "status": "полный текст PDF",
+    "excerpt": "ratio of the losses incurred in claims to the total earned premiums",
+    "sha256": "dc8515a4ce3efe9f6e010226f555f74815ab16a66095b2d47355538c9f9060bf",
+    "bytes": 291553
+  }
+]
